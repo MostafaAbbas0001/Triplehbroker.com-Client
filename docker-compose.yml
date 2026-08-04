@@ -1,0 +1,28 @@
+name: tripleh-client
+
+services:
+  client:
+    container_name: tripleh-client
+    image: tripleh-client:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_SITE_URL: ${VITE_SITE_URL:?Set VITE_SITE_URL in Client/.env}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:?Set VITE_API_BASE_URL in Client/.env}
+    restart: unless-stopped
+    environment:
+      API_INTERNAL_BASE_URL: ${API_INTERNAL_BASE_URL:-http://tripleh-server:8080}
+      HOST: 0.0.0.0
+      PORT: 8080
+    ports:
+      - "${CLIENT_PORT:-8080}:8080"
+    networks:
+      tripleh-network:
+        aliases:
+          - tripleh-client
+
+networks:
+  tripleh-network:
+    name: ${DOCKER_NETWORK_NAME:-tripleh-network}
+    external: true

@@ -1,0 +1,16 @@
+node_modules/
+.output/
+.tanstack/
+.wrangler/
+.nitro/
+dist/
+coverage/
+*.log
+.env
+.env.*
+.git/
+.gitignore
+.vscode/
+.idea/
+Dockerfile*
+docker-compose*.yml
