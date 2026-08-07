@@ -16,7 +16,7 @@ services:
       HOST: 0.0.0.0
       PORT: 8080
     ports:
-      - "${CLIENT_PORT:-8080}:8080"
+      - "127.0.0.1:${CLIENT_PORT:-8080}:8080"
     networks:
       tripleh-network:
         aliases:
