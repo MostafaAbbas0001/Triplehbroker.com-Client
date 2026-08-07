@@ -289,6 +289,7 @@ async function getSite(queryClient: QueryClient, locale: Locale): Promise<SiteCo
   ) as SiteContent["legalDocuments"];
   return {
     companyName: raw.companyName,
+    tagline: raw.tagline,
     logoUrl: raw.logoUrl,
     footerDescription: raw.footerDescription,
     licenceText: raw.licenceText,

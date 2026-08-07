@@ -14,6 +14,7 @@ export type PageSeo = {
 
 export type SiteContent = {
   companyName: string;
+  tagline: string;
   logoUrl: string;
   footerDescription: string;
   licenceText: string;

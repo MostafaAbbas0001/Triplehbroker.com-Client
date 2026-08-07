@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils";
 
 const HEADER_COPY = {
   en: {
-    tagline: "Independent insurance brokerage",
     menu: "Menu",
     close: "Close menu",
     links: [
@@ -19,7 +18,6 @@ const HEADER_COPY = {
     ],
   },
   ar: {
-    tagline: "وساطة تأمين مستقلة",
     menu: "القائمة",
     close: "إغلاق القائمة",
     links: [
@@ -35,7 +33,6 @@ const HEADER_COPY = {
 
 export function Wordmark({ tone = "default" }: { tone?: "default" | "inverse" }) {
   const { locale, site } = useI18n();
-  const copy = HEADER_COPY[locale];
   return (
     <Link
       to="/$locale"
@@ -68,7 +65,7 @@ export function Wordmark({ tone = "default" }: { tone?: "default" | "inverse" })
             tone === "inverse" ? "text-inverse-muted" : "text-muted-foreground",
           )}
         >
-          {copy.tagline}
+          {site.tagline}
         </span>
       </span>
     </Link>
