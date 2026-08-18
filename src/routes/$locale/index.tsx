@@ -103,10 +103,6 @@ function HomePage() {
                         loading="lazy"
                         className="absolute inset-0 size-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
                       />
-                      <div
-                        aria-hidden="true"
-                        className="absolute inset-0 bg-primary/80 mix-blend-multiply"
-                      />
                       <div className="relative flex size-full flex-col justify-end p-8 sm:p-10">
                         <span className="type-caption tabular-nums text-inverse-muted">
                           {String(index + 1).padStart(2, "0")}
