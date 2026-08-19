@@ -403,11 +403,13 @@ function renderStructuredSection(node: BuilderNode, context: BuilderRenderContex
 
   if (kind === "hero-banner") {
     const buttons = objectArray(content["items"]);
+    const heroHeading = stringValue(content["heading"]) || stringValue(content["title"]);
+    const heroIntro = stringValue(content["intro"]) || stringValue(content["lead"]);
     return (
       <div className="max-w-3xl text-[color:var(--hero-heading)]">
         {stringValue(content["eyebrow"]) ? <p className="type-label text-inverse-muted">{stringValue(content["eyebrow"])}</p> : null}
-        <h1 className="type-h1 mt-8 max-w-[18ch] text-inverse-foreground">{stringValue(content["heading"] ?? content["title"])}</h1>
-        {stringValue(content["lead"]) ? <p className="mt-6 max-w-2xl text-[1.0625rem] leading-relaxed text-inverse-muted">{stringValue(content["lead"])}</p> : null}
+        <h1 className="type-h1 mt-8 max-w-[18ch] text-inverse-foreground">{heroHeading}</h1>
+        {heroIntro ? <p className="mt-6 max-w-2xl text-[1.0625rem] leading-relaxed text-inverse-muted">{heroIntro}</p> : null}
         {buttons.length ? <div className="mt-10 flex flex-wrap gap-4">{buttons.map((button, index) => <ActionAnchor key={index} href={stringValue(button["href"]) || "#"} variant={buttonVariant(button["variant"]) === "inverseOutline" ? "inverseOutline" : "inverse"}>{stringValue(button["label"])}</ActionAnchor>)}</div> : null}
       </div>
     );
