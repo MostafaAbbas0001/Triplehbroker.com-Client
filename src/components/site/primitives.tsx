@@ -101,10 +101,10 @@ const actionStyles = cva(
   {
     variants: {
       variant: {
-        primary: "glass-btn-primary text-primary-foreground",
+        primary: "glass-btn-primary text-[color:var(--button-primary-text)]",
         secondary: "glass-btn text-foreground hover:text-primary",
-        inverse: "glass-btn-dark text-inverse-foreground",
-        inverseOutline: "glass-btn-dark border-white/45 text-inverse-foreground",
+        inverse: "glass-btn-dark text-[color:var(--button-inverse-text)]",
+        inverseOutline: "glass-btn-dark border-white/45 text-[color:var(--button-inverse-text)]",
         ghost:
           "rounded-none border-transparent bg-transparent px-0! text-primary hover:text-foreground",
       },
@@ -241,6 +241,7 @@ export function MediaStage({
   brandSideOverlay = false,
   topOverlay = false,
   className,
+  sectionKey,
   children,
 }: {
   src: string;
@@ -253,10 +254,14 @@ export function MediaStage({
   brandSideOverlay?: boolean;
   topOverlay?: boolean;
   className?: string;
+  sectionKey?: string;
   children: ReactNode;
 }) {
   return (
-    <div className={cn("media-frame flex w-full", stageHeights[height], className)}>
+    <div
+      className={cn("media-frame flex w-full", stageHeights[height], className)}
+      data-page-section={sectionKey}
+    >
       <picture>
         {mobileSrc ? <source media="(max-width: 767px)" srcSet={mobileSrc} /> : null}
         <img

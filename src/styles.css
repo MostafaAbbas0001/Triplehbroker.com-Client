@@ -52,6 +52,14 @@
   --inverse-muted: #e7eef7;
   --inverse-border: #1b4477;
 
+  /* Global Hero and action colors */
+  --hero-heading: var(--inverse-foreground);
+  --hero-body: var(--inverse-muted);
+  --button-primary: var(--primary);
+  --button-primary-text: var(--primary-foreground);
+  --button-inverse: var(--white);
+  --button-inverse-text: var(--inverse-foreground);
+
   /* Glass */
   --glass-surface: rgba(248, 251, 255, 0.54);
   --glass-surface-strong: rgba(249, 252, 255, 0.72);
@@ -534,8 +542,8 @@
   overflow: hidden;
   background: linear-gradient(
     145deg,
-    color-mix(in oklab, var(--primary) 50%, transparent),
-    color-mix(in oklab, var(--brand-900) 64%, transparent)
+    color-mix(in oklab, var(--button-primary) 50%, transparent),
+    color-mix(in oklab, var(--button-primary) 78%, var(--brand-900))
   );
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   backdrop-filter: blur(20px) saturate(180%);
@@ -617,9 +625,9 @@
   overflow: hidden;
   background: linear-gradient(
     145deg,
-    rgba(255, 255, 255, 0.18),
-    rgba(255, 255, 255, 0.04) 45%,
-    rgba(255, 255, 255, 0.1)
+    color-mix(in oklab, var(--button-inverse) 18%, transparent),
+    color-mix(in oklab, var(--button-inverse) 4%, transparent) 45%,
+    color-mix(in oklab, var(--button-inverse) 10%, transparent)
   );
   -webkit-backdrop-filter: blur(22px) saturate(165%);
   backdrop-filter: blur(22px) saturate(165%);

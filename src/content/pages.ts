@@ -1,5 +1,3 @@
-import type { SolutionSlug } from "@/i18n/config";
-
 export type PageSeo = {
   title: string;
   description: string;
@@ -39,7 +37,7 @@ export type SolutionCopy = {
 export type SolutionsContent = PageSeo & {
   imageAlt: string;
   heroImageUrl: string;
-  order: readonly SolutionSlug[];
+  order: readonly string[];
   indexHref: string;
   quoteHref: string;
   eyebrow: string;
@@ -47,7 +45,7 @@ export type SolutionsContent = PageSeo & {
   lead: string;
   navigation: { breadcrumb: string; back: string; quote: string };
   detail: { whatItCovers: string; whoItIsFor: string; howWeHelp: string; otherSolutions: string };
-  items: Record<SolutionSlug, SolutionCopy>;
+  items: Record<string, SolutionCopy>;
 };
 
 export type HomeContent = PageSeo & {
@@ -55,15 +53,22 @@ export type HomeContent = PageSeo & {
     eyebrow: string;
     title: string;
     lead: string;
-    primary: string;
-    secondary: string;
+    buttons: Array<{ label: string; href: string; variant?: "inverse" | "inverseOutline" }>;
     imageAlt: string;
     desktopImageUrl: string;
     mobileImageUrl: string;
-    primaryHref: string;
-    secondaryHref: string;
   };
-  lines: { eyebrow: string; title: string; lead: string };
+  lines: {
+    eyebrow: string;
+    title: string;
+    lead: string;
+    items?: Array<{
+      solutionSlug: string;
+      imageUrl: string;
+      href: string;
+      position: number;
+    }>;
+  };
   why: {
     eyebrow: string;
     title: string;

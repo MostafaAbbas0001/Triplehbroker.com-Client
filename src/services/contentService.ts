@@ -1,29 +1,8 @@
 import { queryOptions, type QueryClient } from "@tanstack/react-query";
-import type {
-  AboutContent,
-  ClaimsContent,
-  ContactContent,
-  FaqContent,
-  HomeContent,
-  QuoteContent,
-  SiteContent,
-  SolutionsContent,
-} from "@/content/pages";
-import type { Locale, SolutionSlug } from "@/i18n/config";
-import { pageService, type PageResponse } from "./pageService";
-import { sectionService, type SectionResponse } from "./sectionService";
+import type { ContactContent, SiteContent } from "@/content/pages";
+import type { Locale } from "@/i18n/config";
+import { builderQueryKeys, builderService, type BuilderNode } from "./builderService";
 import { siteSettingService } from "./siteSettingService";
-
-type PageName = "home" | "about" | "solutions" | "claims" | "quote" | "contact" | "faq";
-type PageContentByName = {
-  home: HomeContent;
-  about: AboutContent;
-  solutions: SolutionsContent;
-  claims: ClaimsContent;
-  quote: QuoteContent;
-  contact: ContactContent;
-  faq: FaqContent;
-};
 
 type RawSiteContent = Omit<SiteContent, "legalDocuments"> & {
   documents: Array<{
@@ -42,233 +21,103 @@ export const contentQueryKeys = {
     [...contentQueryKeys.all, "site-settings", `site-${locale}`] as const,
 };
 
-const pagesQuery = queryOptions({
-  queryKey: contentQueryKeys.pages(),
-  queryFn: ({ signal }) => pageService.getAll(signal),
-});
-
-const sectionsQuery = (pageId: string) =>
-  queryOptions({
-    queryKey: contentQueryKeys.sections(pageId),
-    queryFn: ({ signal }) => sectionService.getAllForPage(pageId, signal),
-  });
-
 const siteSettingQuery = (locale: Locale) =>
   queryOptions({
     queryKey: contentQueryKeys.siteSetting(locale),
     queryFn: ({ signal }) => siteSettingService.getByKey(`site-${locale}`, signal),
   });
 
-function pageSlug(locale: Locale, pageName: PageName) {
-  return pageName === "home" ? locale : `${locale}/${pageName}`;
+function sectionContent(nodes: BuilderNode[], kind: string): Record<string, unknown> {
+  const node = nodes.find(
+    (candidate) =>
+      candidate.visible !== false &&
+      (candidate.settings?.["sectionType"] === kind || candidate.type === kind),
+  );
+  return node?.content && typeof node.content === "object" && !Array.isArray(node.content)
+    ? (node.content as Record<string, unknown>)
+    : {};
 }
 
-function findPage(pages: PageResponse[], locale: Locale, pageName: PageName) {
-  const slug = pageSlug(locale, pageName);
-  const page = pages.find((candidate) => candidate.slug === slug);
-  if (!page)
-    throw new Error(`Backend content page '${slug}' was not found. Run the database seed.`);
-  return page;
+function text(value: unknown) {
+  return typeof value === "string" || typeof value === "number" ? String(value) : "";
 }
 
-function content<T>(sections: SectionResponse[], key: string): T {
-  const section = sections.find((candidate) => candidate.key === key);
-  if (!section) throw new Error(`Backend content section '${key}' was not found.`);
-  return section.content as T;
+function records(value: unknown): Array<Record<string, unknown>> {
+  return Array.isArray(value)
+    ? value.filter(
+        (item): item is Record<string, unknown> =>
+          Boolean(item) && typeof item === "object" && !Array.isArray(item),
+      )
+    : [];
 }
 
-function seo(page: PageResponse) {
+async function getContact(queryClient: QueryClient, locale: Locale): Promise<ContactContent> {
+  const page = await queryClient.ensureQueryData({
+    queryKey: builderQueryKeys.live(locale, "contact"),
+    queryFn: ({ signal }) => builderService.getLive(locale, "contact", signal),
+  });
+  const nodes = page.document.children;
+  const hero = sectionContent(nodes, "hero-banner");
+  const office = sectionContent(nodes, "address-block");
+  const hours = sectionContent(nodes, "hours-location");
+  const details = sectionContent(nodes, "contact-details");
+  const form = sectionContent(nodes, "form");
+  const methods = records(details["items"]);
+  const byLabel = (part: string) =>
+    methods.find((item) => text(item["label"]).toLowerCase().includes(part));
+  const email = methods.find((item) => text(item["href"]).startsWith("mailto:")) ?? byLabel("email");
+  const whatsapp = byLabel("whatsapp") ?? byLabel("واتساب");
+  const phone =
+    methods.find((item) => item !== email && item !== whatsapp && text(item["href"]).startsWith("tel:")) ??
+    byLabel("phone") ??
+    byLabel("هاتف");
+  const fields = records(form["items"]);
+  const field = (name: string) => fields.find((item) => text(item["name"]) === name) ?? {};
+  const address = Array.isArray(office["address"])
+    ? office["address"].map(text)
+    : text(office["address"]).split("\n").filter(Boolean);
+  const subjectOptions = field("subject")["options"];
+
   return {
     title: page.seoData.title ?? page.title,
     description: page.seoData.description ?? "",
     canonicalUrl: page.seoData.canonicalUrl,
     robots: page.seoData.robots,
     openGraph: page.seoData.openGraph,
+    heroImageUrl: text(hero["desktopImageUrl"] ?? hero["heroImageUrl"]),
+    imageAlt: text(hero["imageAlt"] ?? hero["officeImageAlt"]),
+    eyebrow: text(hero["eyebrow"]),
+    heading: text(hero["heading"] ?? hero["title"]),
+    lead: text(hero["intro"] ?? hero["lead"]),
+    officeTitle: text(office["heading"]),
+    address,
+    hoursTitle: text(hours["heading"]),
+    hours: records(hours["items"]).map((item) => ({
+      day: text(item["day"]),
+      time: text(item["time"]),
+    })),
+    whatsappLabel: text(whatsapp?.["label"]),
+    whatsapp: text(whatsapp?.["value"]),
+    phoneLabel: text(phone?.["label"]),
+    phone: text(phone?.["value"]),
+    emailLabel: text(email?.["label"]),
+    email: text(email?.["value"]),
+    privacyNotice: text(form["intro"]),
+    formTitle: text(form["heading"]),
+    form: {
+      name: text(field("name")["label"]),
+      email: text(field("email")["label"]),
+      phone: text(field("phone")["label"]),
+      subject: text(field("subject")["label"]),
+      subjectOptions: Array.isArray(subjectOptions)
+        ? subjectOptions.map(text)
+        : text(subjectOptions).split(",").map((item) => item.trim()).filter(Boolean),
+      message: text(field("message")["label"]),
+      submit: text(form["submitLabel"]),
+      success: text(form["successMessage"]),
+      errors: { name: "", email: "", message: "" },
+    },
   };
-}
-
-const mappers: {
-  [Key in PageName]: (page: PageResponse, sections: SectionResponse[]) => PageContentByName[Key];
-} = {
-  home: (page, sections) => ({
-    ...seo(page),
-    hero: content<HomeContent["hero"]>(sections, "hero"),
-    lines: content<HomeContent["lines"]>(sections, "insurance-services"),
-    why: content<HomeContent["why"]>(sections, "why-triple-h"),
-  }),
-  about: (page, sections) => {
-    const hero = content<
-      Pick<AboutContent, "heroImageUrl" | "officeImageAlt" | "eyebrow" | "heading" | "lead">
-    >(sections, "hero");
-    const story = content<{ items: AboutContent["story"] }>(sections, "story");
-    const facts = content<{ title: string; items: AboutContent["facts"] }>(sections, "facts");
-    const commitments = content<{ title: string; items: AboutContent["commitments"] }>(
-      sections,
-      "commitments",
-    );
-    return {
-      ...seo(page),
-      ...hero,
-      story: story.items,
-      factsTitle: facts.title,
-      facts: facts.items,
-      commitmentsTitle: commitments.title,
-      commitments: commitments.items,
-    };
-  },
-  solutions: (page, sections) => {
-    const hero = content<
-      Pick<SolutionsContent, "heroImageUrl" | "imageAlt" | "eyebrow" | "heading" | "lead">
-    >(sections, "hero");
-    const detail = content<
-      SolutionsContent["detail"] & {
-        order: SolutionSlug[];
-        indexHref: string;
-        quoteHref: string;
-        breadcrumb: string;
-        back: string;
-        quote: string;
-      }
-    >(sections, "detail");
-    const catalog = content<{ items: SolutionsContent["items"] }>(sections, "catalog");
-    return {
-      ...seo(page),
-      ...hero,
-      order: detail.order,
-      indexHref: detail.indexHref,
-      quoteHref: detail.quoteHref,
-      navigation: { breadcrumb: detail.breadcrumb, back: detail.back, quote: detail.quote },
-      detail: {
-        whatItCovers: detail.whatItCovers,
-        whoItIsFor: detail.whoItIsFor,
-        howWeHelp: detail.howWeHelp,
-        otherSolutions: detail.otherSolutions,
-      },
-      items: catalog.items,
-    };
-  },
-  claims: (page, sections) => {
-    const hero = content<
-      Pick<ClaimsContent, "heroImageUrl" | "imageAlt" | "eyebrow" | "heading" | "lead"> & {
-        button: { label: string; href: string };
-      }
-    >(sections, "hero");
-    const process = content<{ title: string; steps: ClaimsContent["steps"] }>(sections, "process");
-    const prepare = content<{ title: string; items: ClaimsContent["prepare"] }>(
-      sections,
-      "prepare",
-    );
-    const claimsDesk = content<{ title: string; body: string }>(sections, "claims-desk");
-    return {
-      ...seo(page),
-      heroImageUrl: hero.heroImageUrl,
-      imageAlt: hero.imageAlt,
-      eyebrow: hero.eyebrow,
-      heading: hero.heading,
-      lead: hero.lead,
-      contactHref: hero.button.href,
-      contactLabel: hero.button.label,
-      stepsTitle: process.title,
-      steps: process.steps,
-      prepareTitle: prepare.title,
-      prepare: prepare.items,
-      contactTitle: claimsDesk.title,
-      contactBody: claimsDesk.body,
-    };
-  },
-  quote: (page, sections) => {
-    const hero = content<Pick<QuoteContent, "eyebrow" | "heading" | "lead">>(sections, "hero");
-    const progress = content<Pick<QuoteContent, "steps" | "stepLabel" | "of">>(
-      sections,
-      "progress",
-    );
-    const cover = content<{ question: string }>(sections, "cover-step");
-    const details = content<{
-      title: string;
-      fields: Pick<
-        QuoteContent["fields"],
-        | "coverFor"
-        | "coverForOptions"
-        | "budget"
-        | "existing"
-        | "existingOptions"
-        | "notes"
-        | "notesPlaceholder"
-      >;
-    }>(sections, "details-step");
-    const contact = content<{
-      title: string;
-      fields: Pick<
-        QuoteContent["fields"],
-        "name" | "email" | "phone" | "preferred" | "preferredOptions"
-      >;
-    }>(sections, "contact-step");
-    const actions = content<Pick<QuoteContent, "back" | "next" | "submit">>(sections, "actions");
-    const success = content<
-      Pick<QuoteContent, "successTitle" | "successBody" | "successReset" | "summaryTitle">
-    >(sections, "success");
-    const errors = content<QuoteContent["errors"]>(sections, "errors");
-    return {
-      ...seo(page),
-      ...hero,
-      ...progress,
-      coverQuestion: cover.question,
-      detailsTitle: details.title,
-      contactTitle: contact.title,
-      fields: { ...details.fields, ...contact.fields },
-      ...actions,
-      ...success,
-      errors,
-    };
-  },
-  contact: (page, sections) => {
-    const hero = content<
-      Pick<ContactContent, "heroImageUrl" | "imageAlt" | "eyebrow" | "heading" | "lead">
-    >(sections, "hero");
-    const office = content<{ title: string; address: string[] }>(sections, "office");
-    const hours = content<{ title: string; items: ContactContent["hours"] }>(sections, "hours");
-    const methods = content<
-      Pick<
-        ContactContent,
-        "whatsappLabel" | "whatsapp" | "phoneLabel" | "phone" | "emailLabel" | "email"
-      >
-    >(sections, "contact-methods");
-    const form = content<{ title: string; privacyNotice: string } & ContactContent["form"]>(
-      sections,
-      "form",
-    );
-    const { title: formTitle, privacyNotice, ...formFields } = form;
-    return {
-      ...seo(page),
-      ...hero,
-      officeTitle: office.title,
-      address: office.address,
-      hoursTitle: hours.title,
-      hours: hours.items,
-      ...methods,
-      privacyNotice,
-      formTitle,
-      form: formFields,
-    };
-  },
-  faq: (page, sections) => {
-    const hero = content<
-      Pick<FaqContent, "heroImageUrl" | "imageAlt" | "eyebrow" | "heading" | "lead">
-    >(sections, "hero");
-    const groups = content<{ items: FaqContent["groups"] }>(sections, "question-groups");
-    return { ...seo(page), ...hero, groups: groups.items };
-  },
-};
-
-async function getPage<Key extends PageName>(
-  queryClient: QueryClient,
-  locale: Locale,
-  pageName: Key,
-): Promise<PageContentByName[Key]> {
-  const pages = await queryClient.ensureQueryData(pagesQuery);
-  const page = findPage(pages, locale, pageName);
-  const sections = await queryClient.ensureQueryData(sectionsQuery(page.id));
-  return mappers[pageName](page, sections);
 }
 
 async function getSite(queryClient: QueryClient, locale: Locale): Promise<SiteContent> {
@@ -299,7 +148,7 @@ async function getSite(queryClient: QueryClient, locale: Locale): Promise<SiteCo
 }
 
 export const contentService = {
-  getPage,
+  getContact,
   getSite,
   invalidateAll: (queryClient: QueryClient) =>
     queryClient.invalidateQueries({ queryKey: contentQueryKeys.all }),

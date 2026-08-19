@@ -1,5 +1,4 @@
 import { apiClient } from "@/api/apiClient";
-import { bearerHeaders } from "./authService";
 
 export type SeoDataResponse = {
   title: string | null;
@@ -19,14 +18,4 @@ export type PageResponse = {
 
 export const pageService = {
   getAll: (signal: AbortSignal) => apiClient<PageResponse[]>("/api/pages", { signal }),
-  patch: (
-    id: string,
-    request: Partial<Pick<PageResponse, "title" | "slug" | "seoData">>,
-    token: string,
-  ) =>
-    apiClient<PageResponse>(`/api/pages/${id}`, {
-      method: "PATCH",
-      headers: bearerHeaders(token),
-      body: JSON.stringify(request),
-    }),
 };

@@ -1,12 +1,14 @@
 import { createContext, useContext } from "react";
 import type { ContactContent, SiteContent } from "@/content/pages";
 import type { Locale } from "./config";
+import type { NavigationMenu } from "@/services/navigationService";
 
 export type I18nValue = {
   locale: Locale;
   dir: "ltr" | "rtl";
   site: SiteContent;
   contact: ContactContent;
+  navigation: NavigationMenu;
 };
 
 export const I18nContext = createContext<I18nValue | null>(null);

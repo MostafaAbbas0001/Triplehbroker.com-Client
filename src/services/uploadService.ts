@@ -1,11 +1,14 @@
 import { apiClient } from "@/api/apiClient";
 
 export type UploadResponse = {
+  id: string;
   fileName: string;
   url: string;
   contentType: string;
   size: number;
   uploadedAtUtc: string;
+  altText: string | null;
+  title: string | null;
 };
 
 export const uploadQueryKey = ["uploads"] as const;

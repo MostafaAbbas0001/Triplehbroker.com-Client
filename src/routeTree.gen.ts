@@ -15,6 +15,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as LocaleIndexRouteImport } from './routes/$locale/index'
+import { Route as LocaleSplatRouteImport } from './routes/$locale/$'
 import { Route as LocaleAboutRouteImport } from './routes/$locale/about'
 import { Route as LocaleClaimsRouteImport } from './routes/$locale/claims'
 import { Route as LocaleContactRouteImport } from './routes/$locale/contact'
@@ -51,6 +52,11 @@ const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
 const LocaleIndexRoute = LocaleIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => LocaleRouteRoute,
+} as any)
+const LocaleSplatRoute = LocaleSplatRouteImport.update({
+  id: '/$',
+  path: '/$',
   getParentRoute: () => LocaleRouteRoute,
 } as any)
 const LocaleAboutRoute = LocaleAboutRouteImport.update({
@@ -95,6 +101,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/$locale/$': typeof LocaleSplatRoute
   '/$locale/about': typeof LocaleAboutRoute
   '/$locale/claims': typeof LocaleClaimsRoute
   '/$locale/contact': typeof LocaleContactRoute
@@ -109,6 +116,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/$locale/$': typeof LocaleSplatRoute
   '/$locale/about': typeof LocaleAboutRoute
   '/$locale/claims': typeof LocaleClaimsRoute
   '/$locale/contact': typeof LocaleContactRoute
@@ -125,6 +133,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/$locale/$': typeof LocaleSplatRoute
   '/$locale/about': typeof LocaleAboutRoute
   '/$locale/claims': typeof LocaleClaimsRoute
   '/$locale/contact': typeof LocaleContactRoute
@@ -142,6 +151,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/robots.txt'
     | '/sitemap.xml'
+    | '/$locale/$'
     | '/$locale/about'
     | '/$locale/claims'
     | '/$locale/contact'
@@ -156,6 +166,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/robots.txt'
     | '/sitemap.xml'
+    | '/$locale/$'
     | '/$locale/about'
     | '/$locale/claims'
     | '/$locale/contact'
@@ -171,6 +182,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/robots.txt'
     | '/sitemap.xml'
+    | '/$locale/$'
     | '/$locale/about'
     | '/$locale/claims'
     | '/$locale/contact'
@@ -233,6 +245,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LocaleIndexRouteImport
       parentRoute: typeof LocaleRouteRoute
     }
+    '/$locale/$': {
+      id: '/$locale/$'
+      path: '/$'
+      fullPath: '/$locale/$'
+      preLoaderRoute: typeof LocaleSplatRouteImport
+      parentRoute: typeof LocaleRouteRoute
+    }
     '/$locale/about': {
       id: '/$locale/about'
       path: '/about'
@@ -286,6 +305,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface LocaleRouteRouteChildren {
+  LocaleSplatRoute: typeof LocaleSplatRoute
   LocaleAboutRoute: typeof LocaleAboutRoute
   LocaleClaimsRoute: typeof LocaleClaimsRoute
   LocaleContactRoute: typeof LocaleContactRoute
@@ -297,6 +317,7 @@ interface LocaleRouteRouteChildren {
 }
 
 const LocaleRouteRouteChildren: LocaleRouteRouteChildren = {
+  LocaleSplatRoute: LocaleSplatRoute,
   LocaleAboutRoute: LocaleAboutRoute,
   LocaleClaimsRoute: LocaleClaimsRoute,
   LocaleContactRoute: LocaleContactRoute,
