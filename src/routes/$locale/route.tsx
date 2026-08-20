@@ -56,11 +56,11 @@ function LocaleLayout() {
       <div
         dir={dirOf(locale)}
         lang={locale}
-        className="flex min-h-dvh flex-col"
+        className="flex min-h-dvh w-full min-w-0 max-w-full flex-col overflow-x-clip"
         style={themeVariables(theme, locale)}
       >
         <Header />
-        <main className="flex-1">
+        <main className="min-w-0 flex-1">
           <PageTransition>
             <Outlet />
           </PageTransition>

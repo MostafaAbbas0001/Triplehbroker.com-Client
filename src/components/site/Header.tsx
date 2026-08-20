@@ -127,17 +127,15 @@ export function Header() {
     )
     .map((data) => data?.page ?? data?.builderPage)
     .find(Boolean);
-  const documentHeroVisible =
+  const hasMediaHero =
     builderPage?.document.children.some(
       (node) =>
+        node.visible !== false &&
         (node.type === "hero" ||
           (node.type === "section" &&
             (node.settings?.["sectionType"] === "hero" ||
-              node.settings?.["sectionType"] === "hero-banner"))) &&
-        node.visible !== false,
+              node.settings?.["sectionType"] === "hero-banner"))),
     ) ?? false;
-  const hasMediaHero =
-    documentHeroVisible && builderPage?.document.settings.headerMode === "media-overlay";
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -421,10 +419,13 @@ export function Header() {
         <div
           ref={linkMeasureRef}
           aria-hidden="true"
-          className="pointer-events-none absolute invisible flex items-center gap-8 whitespace-nowrap"
+          className="pointer-events-none absolute start-0 top-0 flex size-0 items-center gap-8 overflow-hidden whitespace-nowrap opacity-0"
         >
           {links.map((link) => (
-            <span key={link.id} className="py-2 text-[0.75rem] uppercase tracking-[0.18em]">
+            <span
+              key={link.id}
+              className="shrink-0 py-2 text-[0.75rem] uppercase tracking-[0.18em]"
+            >
               {link.label}
             </span>
           ))}

@@ -44,7 +44,7 @@ import {
   type BuilderPageSummary,
 } from "@/services/builderService";
 import type { Locale } from "@/i18n/config";
-import { cn } from "@/lib/utils";
+import { cn, createId } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -52,6 +52,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  builderNodes,
+  builderObject,
+  createBuilderCard as createRegisteredCard,
+  createBuilderImage as createRegisteredImage,
+  createBuilderSection as createRegisteredSection,
+  getSectionKind,
+  isHeroSection,
+  sectionCategories,
+  sectionHelp,
+  type BuilderSectionKind,
+} from "@/components/builder/sections";
 
 export const Route = createFileRoute("/admin")({
   headers: () => ({
@@ -637,7 +650,7 @@ function CreatePagePanel({
   const [slug, setSlug] = useState("");
   const create = useMutation({
     mutationFn: () => {
-      const hero = createBuilderSection("hero-banner");
+      const hero = createRegisteredSection("hero-banner");
       const initialHero = {
         ...hero,
         content: { ...builderObject(hero.content), heading: title },
@@ -724,6 +737,8 @@ function BuilderPageEditor({
   const [builderPreviewSize, setBuilderPreviewSize] = useState<PreviewSize>("desktop");
   const [sectionPanelOpen, setSectionPanelOpen] = useState(true);
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(true);
+  const [removeSectionOpen, setRemoveSectionOpen] = useState(false);
+  const [deletePageOpen, setDeletePageOpen] = useState(false);
 
   useEffect(() => {
     if (!pageQuery.data) return;
@@ -777,10 +792,11 @@ function BuilderPageEditor({
     selectedSectionIndex >= 0 ? document.children[selectedSectionIndex] : null;
   const removeSelectedSection = () => {
     if (!selectedSection) return;
-    const sectionName = humanize(
-      selectedSection.type === "section" ? getSectionKind(selectedSection) : selectedSection.type,
-    );
-    if (!window.confirm(`Remove this ${sectionName} section?`)) return;
+    setRemoveSectionOpen(true);
+  };
+
+  const confirmRemoveSelectedSection = () => {
+    if (!selectedSection) return;
 
     const children = document.children.filter((section) => section.id !== selectedSection.id);
     const firstSection = children[0];
@@ -795,6 +811,7 @@ function BuilderPageEditor({
     });
     const nextSection = children[Math.min(selectedSectionIndex, children.length - 1)] ?? null;
     setSelectedSectionId(nextSection?.id ?? null);
+    setRemoveSectionOpen(false);
   };
   const moveSelectedSection = (position: number) => {
     if (!selectedSection) return;
@@ -976,9 +993,7 @@ function BuilderPageEditor({
                               ...document,
                               settings: {
                                 ...document.settings,
-                                headerMode: isHeroSection(firstSection)
-                                  ? "media-overlay"
-                                  : "solid",
+                                headerMode: isHeroSection(firstSection) ? "media-overlay" : "solid",
                               },
                               children,
                             });
@@ -1025,7 +1040,9 @@ function BuilderPageEditor({
                                         layoutGroup: inColumns
                                           ? String(section.settings?.["layoutGroup"] || "group-1")
                                           : "",
-                                        layoutColumn: Number(section.settings?.["layoutColumn"] ?? 1),
+                                        layoutColumn: Number(
+                                          section.settings?.["layoutColumn"] ?? 1,
+                                        ),
                                       },
                                     }
                                   : section,
@@ -1066,8 +1083,8 @@ function BuilderPageEditor({
                             />
                           </label>
                           <p className="col-span-2 text-xs leading-5 text-muted-foreground">
-                            Sections with the same group name share one row. Sections using the
-                            same column number stack vertically.
+                            Sections with the same group name share one row. Sections using the same
+                            column number stack vertically.
                           </p>
                         </div>
                       ) : null}
@@ -1160,14 +1177,7 @@ function BuilderPageEditor({
               <button
                 type="button"
                 disabled={pending}
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      `Permanently delete “${summary.title}”? This removes it and its content from the database and cannot be undone.`,
-                    )
-                  )
-                    remove.mutate();
-                }}
+                onClick={() => setDeletePageOpen(true)}
                 className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-full border border-error/30 px-5 text-sm font-semibold text-error disabled:opacity-60"
               >
                 <Trash2 size={14} /> Permanently delete page
@@ -1176,6 +1186,27 @@ function BuilderPageEditor({
           ) : null}
         </section>
       ) : null}
+      <ConfirmDialog
+        open={removeSectionOpen}
+        onOpenChange={setRemoveSectionOpen}
+        title="Remove section?"
+        description={`Remove this ${humanize(
+          selectedSection?.type === "section"
+            ? getSectionKind(selectedSection)
+            : (selectedSection?.type ?? "selected"),
+        )} section from the page?`}
+        confirmLabel="Remove section"
+        onConfirm={confirmRemoveSelectedSection}
+      />
+      <ConfirmDialog
+        open={deletePageOpen}
+        onOpenChange={setDeletePageOpen}
+        title="Permanently delete page?"
+        description={`Delete “${summary.title}” and all of its content from the database? This cannot be undone.`}
+        confirmLabel="Delete page"
+        pending={remove.isPending}
+        onConfirm={() => remove.mutate()}
+      />
     </div>
   );
 }
@@ -1263,7 +1294,7 @@ function BuilderOutline({
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [librarySearch, setLibrarySearch] = useState("");
   const add = (kind: BuilderSectionKind) => {
-    const section = createBuilderSection(kind);
+    const section = createRegisteredSection(kind);
     const children = [...document.children, section];
     onChange({
       ...document,
@@ -1511,268 +1542,6 @@ function SeoFields({
   );
 }
 
-export function LegacyBuilderSectionsEditor({
-  document,
-  onChange,
-}: {
-  document: BuilderDocument;
-  onChange: (document: BuilderDocument) => void;
-}) {
-  const updateSections = (children: BuilderNode[]) => onChange({ ...document, children });
-  const updateSection = (index: number, section: BuilderNode) =>
-    updateSections(
-      document.children.map((candidate, position) => (position === index ? section : candidate)),
-    );
-
-  return (
-    <div className="mt-6">
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-border bg-muted/20 p-4">
-        <span className="me-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-          Add a section
-        </span>
-        {(["hero", "text", "image-text", "cards", "call-to-action"] as const).map((kind) => (
-          <button
-            key={kind}
-            type="button"
-            onClick={() => updateSections([...document.children, createBuilderSection(kind)])}
-            className="inline-flex min-h-9 items-center gap-1 rounded-full border border-border bg-background px-3 text-xs font-semibold text-foreground hover:border-primary hover:text-primary"
-          >
-            <Plus size={12} /> {humanize(kind)}
-          </button>
-        ))}
-      </div>
-
-      {document.children.length === 0 ? (
-        <div className="mt-5 rounded-lg border border-border bg-muted/20 p-8 text-center text-sm text-muted-foreground">
-          This page is empty. Add the first section above.
-        </div>
-      ) : (
-        <div className="mt-5 space-y-3">
-          {document.children.map((section, index) => (
-            <details
-              key={section.id}
-              className="group rounded-lg border border-border bg-background"
-            >
-              <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-4">
-                <span className="grid size-7 place-items-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
-                  {index + 1}
-                </span>
-                <span className="flex-1 text-sm font-semibold text-foreground">
-                  {humanize(section.type)}
-                </span>
-                <button
-                  type="button"
-                  title="Move up"
-                  disabled={index === 0}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    if (index === 0) return;
-                    const next = [...document.children];
-                    [next[index - 1], next[index]] = [next[index]!, next[index - 1]!];
-                    updateSections(next);
-                  }}
-                  className="px-2 text-sm text-muted-foreground disabled:opacity-25"
-                >
-                  ↑
-                </button>
-                <button
-                  type="button"
-                  title="Move down"
-                  disabled={index === document.children.length - 1}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    if (index === document.children.length - 1) return;
-                    const next = [...document.children];
-                    [next[index], next[index + 1]] = [next[index + 1]!, next[index]!];
-                    updateSections(next);
-                  }}
-                  className="px-2 text-sm text-muted-foreground disabled:opacity-25"
-                >
-                  ↓
-                </button>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    if (window.confirm(`Remove the ${humanize(section.type)} section?`))
-                      updateSections(document.children.filter((_, position) => position !== index));
-                  }}
-                  className="px-2 text-xs font-semibold text-error"
-                >
-                  Remove
-                </button>
-                <ChevronDown
-                  size={15}
-                  className="ms-1 text-muted-foreground transition-transform group-open:rotate-180"
-                />
-              </summary>
-              <div className="space-y-5 border-t border-border p-5">
-                <label className="flex items-center justify-between gap-4 rounded-md bg-muted/30 px-4 py-3">
-                  <span className="text-sm font-medium text-foreground">Show this section</span>
-                  <input
-                    type="checkbox"
-                    checked={section.visible !== false}
-                    onChange={(event) =>
-                      updateSection(index, { ...section, visible: event.target.checked })
-                    }
-                  />
-                </label>
-                {section.content !== undefined ? (
-                  <div>
-                    <p className="mb-3 text-sm font-semibold text-foreground">Content</p>
-                    <JsonFields
-                      value={section.content}
-                      onChange={(content) => updateSection(index, { ...section, content })}
-                    />
-                  </div>
-                ) : null}
-                {section.children ? (
-                  <div>
-                    <p className="mb-3 text-sm font-semibold text-foreground">Content blocks</p>
-                    <JsonFields
-                      value={section.children as unknown as JsonValue}
-                      onChange={(children) =>
-                        updateSection(index, {
-                          ...section,
-                          children: children as unknown as BuilderNode[],
-                        })
-                      }
-                    />
-                  </div>
-                ) : null}
-                {section.styles ? (
-                  <details className="rounded-md border border-border bg-muted/20">
-                    <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-foreground">
-                      Design options
-                    </summary>
-                    <div className="border-t border-border p-4">
-                      <JsonFields
-                        value={section.styles as unknown as JsonValue}
-                        onChange={(styles) =>
-                          updateSection(index, {
-                            ...section,
-                            styles: styles as NonNullable<BuilderNode["styles"]>,
-                          })
-                        }
-                      />
-                    </div>
-                  </details>
-                ) : null}
-              </div>
-            </details>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-type BuilderSectionKind =
-  | "hero"
-  | "hero-banner"
-  | "text"
-  | "image-text"
-  | "cards"
-  | "call-to-action"
-  | "editorial-story"
-  | "callout"
-  | "faq-groups"
-  | "address-block"
-  | "statistics"
-  | "steps"
-  | "feature-list"
-  | "faq"
-  | "testimonials"
-  | "contact-details"
-  | "hours-location"
-  | "solutions-catalog"
-  | "automatic-solution-catalog"
-  | "solution-cards"
-  | "solution-introduction"
-  | "coverage-details"
-  | "related-links"
-  | "form"
-  | "multi-step-form";
-
-const sectionHelp: Record<BuilderSectionKind, string> = {
-  hero: "Hero title, lead, responsive background images and optional buttons",
-  "hero-banner": "Page hero with heading, lead, responsive images and optional buttons",
-  text: "Section heading and lead",
-  "image-text": "Section heading, lead, image, description, caption and optional buttons",
-  cards: "Section heading, lead and editable cards with optional media and links",
-  "call-to-action": "Section heading, lead, responsive background and optional buttons",
-  "editorial-story": "Section heading, lead and editable story paragraphs",
-  callout: "Section heading, lead and an optional action button",
-  "faq-groups": "Grouped questions and answers with a section heading and lead",
-  "address-block": "Section heading, lead, postal address and optional map link",
-  statistics: "Section heading, lead and facts with a value and label",
-  steps: "Section heading, lead and numbered steps with titles and descriptions",
-  "feature-list": "Section heading, lead and a checklist of editable items",
-  faq: "Section heading, lead and expandable questions with answers",
-  testimonials: "Section heading, lead and quotes with customer names and roles",
-  "contact-details": "Section heading, lead and linked phone, email or other contact methods",
-  "hours-location": "Section heading, lead, address, map link and daily opening hours",
-  "solutions-catalog": "Section heading, lead and manually managed linked solution cards",
-  "automatic-solution-catalog": "Section heading and lead above a list generated from solution pages",
-  "solution-cards": "Section heading, lead and ordered image cards linked to solution pages",
-  "solution-introduction": "Solution heading, lead, intended audience and quote action",
-  "coverage-details": "Section heading, lead, coverage items and how-you-help content",
-  "related-links": "Section heading and lead above automatic links to other solution pages",
-  form: "Section heading, lead, recipient, submit label and configurable fields",
-  "multi-step-form": "Section heading, lead and configurable fields grouped into named steps",
-};
-
-const sectionCategories: Array<{ label: string; kinds: BuilderSectionKind[] }> = [
-  {
-    label: "Essentials",
-    kinds: ["hero-banner", "text", "image-text", "editorial-story", "call-to-action", "callout"],
-  },
-  { label: "Collections", kinds: ["cards", "statistics", "steps", "feature-list"] },
-  {
-    label: "Solutions",
-    kinds: [
-      "solution-introduction",
-      "coverage-details",
-      "related-links",
-      "automatic-solution-catalog",
-      "solution-cards",
-      "solutions-catalog",
-    ],
-  },
-  { label: "Engagement", kinds: ["faq", "faq-groups", "testimonials"] },
-  {
-    label: "Contact and forms",
-    kinds: ["address-block", "contact-details", "hours-location", "form", "multi-step-form"],
-  },
-];
-
-function builderNodes(node: BuilderNode): BuilderNode[] {
-  return [node, ...(node.children ?? []).flatMap(builderNodes)];
-}
-
-function builderObject(value: JsonValue | undefined): Record<string, JsonValue> {
-  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
-}
-
-function getSectionKind(section: BuilderNode): BuilderSectionKind {
-  const saved = section.settings?.["sectionType"];
-  if (typeof saved === "string" && saved in sectionHelp) return saved as BuilderSectionKind;
-  const nodes = builderNodes(section);
-  if (nodes.some((node) => node.type === "image")) return "image-text";
-  if (nodes.some((node) => node.type === "grid" && node.children?.some((x) => x.type === "stack")))
-    return "cards";
-  if (section.styles?.desktop?.["backgroundColor"] === "var(--inverse)") return "call-to-action";
-  const heading = nodes.find((node) => node.type === "heading");
-  return builderObject(heading?.content)["level"] === 1 ? "hero" : "text";
-}
-
-function isHeroSection(section: BuilderNode | undefined) {
-  if (!section || section.visible === false) return false;
-  return section.type === "hero" ||
-    (section.type === "section" &&
-      (getSectionKind(section) === "hero" || getSectionKind(section) === "hero-banner"));
-}
-
 function changeBuilderNode(
   node: BuilderNode,
   id: string,
@@ -1797,7 +1566,7 @@ function removeBuilderNode(node: BuilderNode, id: string): BuilderNode {
 
 function createOptionalButton(kind: Exclude<BuilderSectionKind, "cards">): BuilderNode {
   return {
-    id: crypto.randomUUID(),
+    id: createId(),
     type: "button",
     visible: true,
     content: {
@@ -1929,7 +1698,7 @@ function BuilderSectionsEditor({
               <button
                 key={kind}
                 type="button"
-                onClick={() => setSections([...document.children, createBuilderSection(kind)])}
+                onClick={() => setSections([...document.children, createRegisteredSection(kind)])}
                 className="rounded-md border border-border bg-background px-3 py-2 text-left hover:border-primary"
               >
                 <span className="block text-xs font-semibold text-foreground">
@@ -2061,9 +1830,7 @@ function HomeInsuranceServicesEditor({
   const setItem = (index: number, key: string, next: JsonValue) =>
     setField(
       "items",
-      items.map((item, itemIndex) =>
-        itemIndex === index ? { ...item, [key]: next } : item,
-      ),
+      items.map((item, itemIndex) => (itemIndex === index ? { ...item, [key]: next } : item)),
     );
 
   return (
@@ -2337,7 +2104,12 @@ const structuredSectionSchemas: Partial<
       { key: "label", label: "Label" },
       { key: "value", label: "Displayed value", multiline: true },
       { key: "href", label: "Link (optional)" },
-      { key: "icon", label: "Icon", control: "select", options: ["none", "message-circle", "phone", "mail", "map-pin", "clock"] },
+      {
+        key: "icon",
+        label: "Icon",
+        control: "select",
+        options: ["none", "message-circle", "phone", "mail", "map-pin", "clock"],
+      },
     ],
     newItem: { label: "Contact method", value: "Add contact details", href: "", icon: "phone" },
   },
@@ -2557,66 +2329,66 @@ function StructuredSectionFields({
         ))}
       </div>
       {hasCollection ? (
-      <div className="rounded-lg border border-border">
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <div>
-            <p className="text-sm font-semibold text-foreground">{schema.collectionLabel}</p>
-            <p className="text-xs text-muted-foreground">{items.length} items</p>
+        <div className="rounded-lg border border-border">
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold text-foreground">{schema.collectionLabel}</p>
+              <p className="text-xs text-muted-foreground">{items.length} items</p>
+            </div>
+            <button
+              type="button"
+              onClick={() =>
+                setContent({ ...content, items: [...items, structuredClone(newItem)] })
+              }
+              className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground"
+            >
+              <Plus size={12} /> Add item
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() =>
-              setContent({ ...content, items: [...items, structuredClone(newItem)] })
-            }
-            className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground"
-          >
-            <Plus size={12} /> Add item
-          </button>
+          <div className="divide-y divide-border">
+            {items.map((item, index) => (
+              <details key={index} className="group" open={items.length === 1}>
+                <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3">
+                  <span className="grid size-6 place-items-center rounded-full bg-muted text-xs font-semibold">
+                    {index + 1}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+                    {String(item[itemFields[0]?.key ?? ""] ?? `Item ${index + 1}`)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      setContent({
+                        ...content,
+                        items: items.filter((_, itemIndex) => itemIndex !== index),
+                      });
+                    }}
+                    className="text-xs font-semibold text-error"
+                  >
+                    Remove
+                  </button>
+                  <ChevronDown size={14} className="group-open:rotate-180" />
+                </summary>
+                <div className="grid gap-4 bg-muted/20 px-4 pb-4 pt-2">
+                  {itemFields.map((field) => (
+                    <StructuredField
+                      key={field.key}
+                      definition={field}
+                      value={item[field.key]}
+                      onChange={(value) => setItem(index, field.key, value)}
+                    />
+                  ))}
+                </div>
+              </details>
+            ))}
+            {!items.length ? (
+              <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+                No items yet. Add the first one above.
+              </p>
+            ) : null}
+          </div>
         </div>
-        <div className="divide-y divide-border">
-          {items.map((item, index) => (
-            <details key={index} className="group" open={items.length === 1}>
-              <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3">
-                <span className="grid size-6 place-items-center rounded-full bg-muted text-xs font-semibold">
-                  {index + 1}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
-                  {String(item[itemFields[0]?.key ?? ""] ?? `Item ${index + 1}`)}
-                </span>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    setContent({
-                      ...content,
-                      items: items.filter((_, itemIndex) => itemIndex !== index),
-                    });
-                  }}
-                  className="text-xs font-semibold text-error"
-                >
-                  Remove
-                </button>
-                <ChevronDown size={14} className="group-open:rotate-180" />
-              </summary>
-              <div className="grid gap-4 bg-muted/20 px-4 pb-4 pt-2">
-                {itemFields.map((field) => (
-                  <StructuredField
-                    key={field.key}
-                    definition={field}
-                    value={item[field.key]}
-                    onChange={(value) => setItem(index, field.key, value)}
-                  />
-                ))}
-              </div>
-            </details>
-          ))}
-          {!items.length ? (
-            <p className="px-4 py-8 text-center text-sm text-muted-foreground">
-              No items yet. Add the first one above.
-            </p>
-          ) : null}
-        </div>
-      </div>
       ) : null}
     </div>
   );
@@ -2710,7 +2482,8 @@ function TightSection({
     (node) =>
       (node.type === "text" || node.type === "paragraph") && node.settings?.["role"] !== "eyebrow",
   );
-  const text = directText ??
+  const text =
+    directText ??
     (kind === "cards"
       ? undefined
       : nodes.find(
@@ -2966,7 +2739,7 @@ function CardsFields({
                   onChange(
                     changeBuilderNode(section, card.id, (node) => ({
                       ...node,
-                      children: [createBuilderImage(), ...(node.children ?? [])],
+                      children: [createRegisteredImage(), ...(node.children ?? [])],
                     })),
                   )
                 }
@@ -3036,7 +2809,7 @@ function CardsFields({
               ...node,
               children: [
                 ...(node.children ?? []),
-                createBuilderCard((node.children?.length ?? 0) + 1),
+                createRegisteredCard((node.children?.length ?? 0) + 1),
               ],
             })),
           )
@@ -3049,392 +2822,11 @@ function CardsFields({
   );
 }
 
-function createBuilderCard(index: number): BuilderNode {
-  return {
-    id: crypto.randomUUID(),
-    type: "stack",
-    visible: true,
-    styles: { desktop: { padding: "28px", border: "1px solid var(--border)", gap: "12px" } },
-    children: [
-      {
-        id: crypto.randomUUID(),
-        type: "heading",
-        visible: true,
-        content: { text: `Card ${index}`, level: 3 },
-      },
-      {
-        id: crypto.randomUUID(),
-        type: "text",
-        visible: true,
-        content: { text: "Add supporting details here." },
-      },
-    ],
-  };
-}
-
-function createBuilderImage(): BuilderNode {
-  return {
-    id: crypto.randomUUID(),
-    type: "image",
-    visible: true,
-    content: { url: "", alt: "", caption: "" },
-    styles: { desktop: { aspectRatio: "4 / 3" } },
-  };
-}
-
-function createStructuredSectionContent(
-  kind: BuilderSectionKind,
-): Record<string, JsonValue> | null {
-  const base = { heading: "New section", intro: "Add a short introduction for this section." };
-  switch (kind) {
-    case "hero-banner":
-      return {
-        eyebrow: "Section label",
-        heading: "New page heading",
-        intro: "Add a clear introduction for this page.",
-        desktopImageUrl: "",
-        mobileImageUrl: "",
-        imageAlt: "",
-        items: [{ label: "Learn more", href: "/contact", variant: "inverse" }],
-      };
-    case "editorial-story":
-      return {
-        heading: "Our story",
-        intro: "Introduce this story and explain why it matters.",
-        items: [{ text: "Add the first story paragraph." }],
-      };
-    case "callout":
-      return {
-        heading: "Need help?",
-        intro: "Explain the next step clearly.",
-        buttonLabel: "Contact us",
-        buttonHref: "/contact",
-      };
-    case "faq-groups":
-      return {
-        heading: "Frequently asked questions",
-        intro: "Find clear answers to common questions.",
-        showArrows: true,
-        smoothMotion: true,
-        items: [
-          { group: "General", question: "New question", answer: "Write the answer here." },
-        ],
-      };
-    case "address-block":
-      return {
-        eyebrow: "Our office",
-        heading: "Our office",
-        intro: "Visit or contact our office.",
-        layout: "compact",
-        icon: "map-pin",
-        address: "Company name\nStreet and building\nCity, Country",
-        mapLabel: "View map",
-        mapUrl: "",
-      };
-    case "statistics":
-      return {
-        ...base,
-        heading: "Key facts",
-        layout: "boxed",
-        items: [
-          { value: "24/7", label: "Client support" },
-          { value: "100%", label: "Independent advice" },
-          { value: "15+", label: "Insurance solutions" },
-        ],
-      };
-    case "steps":
-      return {
-        ...base,
-        heading: "How it works",
-        layout: "grid",
-        items: [
-          { title: "Tell us what you need", body: "Share your situation and priorities." },
-          { title: "Compare your options", body: "We review suitable coverage from the market." },
-          { title: "Stay protected", body: "We remain available when you need support." },
-        ],
-      };
-    case "feature-list":
-      return {
-        ...base,
-        heading: "What to prepare",
-        items: [{ text: "Add the first list item" }, { text: "Add another list item" }],
-      };
-    case "faq":
-      return {
-        ...base,
-        heading: "Frequently asked questions",
-        showArrows: true,
-        smoothMotion: true,
-        items: [
-          { question: "Add your first question", answer: "Write a clear and helpful answer." },
-          { question: "Add another question", answer: "Write a clear and helpful answer." },
-        ],
-      };
-    case "testimonials":
-      return {
-        ...base,
-        heading: "What our clients say",
-        items: [{ quote: "Add a customer testimonial.", name: "Customer name", role: "Customer" }],
-      };
-    case "contact-details":
-      return {
-        ...base,
-        heading: "Contact us",
-        layout: "rows",
-        items: [
-          { label: "Phone", value: "+961", href: "tel:+961", icon: "phone" },
-          { label: "Email", value: "info@example.com", href: "mailto:info@example.com", icon: "mail" },
-          { label: "Address", value: "Add your office address", href: "", icon: "map-pin" },
-        ],
-      };
-    case "hours-location":
-      return {
-        ...base,
-        eyebrow: "Opening hours",
-        heading: "Visit our office",
-        layout: "rows",
-        icon: "clock",
-        address: "Add your office address",
-        mapLabel: "View on map",
-        mapUrl: "",
-        items: [{ day: "Monday – Friday", time: "Open 24 hours" }],
-      };
-    case "solutions-catalog":
-      return {
-        ...base,
-        heading: "Our solutions",
-        items: [
-          {
-            title: "New solution",
-            summary: "Describe this solution.",
-            imageUrl: "",
-            imageAlt: "",
-            linkLabel: "Learn more",
-            href: "",
-          },
-        ],
-      };
-    case "automatic-solution-catalog":
-      return {
-        heading: "Insurance solutions",
-        intro: "Choose a solution to learn what it covers and who it is for.",
-      };
-    case "solution-cards":
-      return {
-        heading: "Insurance services",
-        intro: "Choose a service to learn more.",
-        items: [
-          { solutionSlug: "health", imageUrl: "", imageAlt: "", href: "", position: 1 },
-        ],
-      };
-    case "solution-introduction":
-      return {
-        eyebrow: "Insurance solutions",
-        heading: "Solution name",
-        intro: "Explain this solution and why it matters.",
-        audienceHeading: "Who it is for",
-        audience: "Describe the people or businesses this solution is intended for.",
-        buttonLabel: "Request a quote",
-        buttonHref: "/quote",
-      };
-    case "coverage-details":
-      return {
-        heading: "What it covers",
-        intro: "Review the main areas of cover.",
-        helpHeading: "How we help",
-        help: "Explain how you advise and support the client.",
-        items: [{ text: "Add the first covered item" }, { text: "Add another covered item" }],
-      };
-    case "related-links":
-      return {
-        heading: "Other solutions",
-        intro: "Explore other available insurance solutions.",
-      };
-    case "form":
-    case "multi-step-form":
-      return {
-        ...base,
-        heading: kind === "form" ? "Send us a message" : "Request a quote",
-        ...(kind === "form" ? { appearance: "boxed", columns: 1, optionalLabel: "Optional" } : {}),
-        recipient: "",
-        submitLabel: "Send",
-        items: [
-          {
-            ...(kind === "multi-step-form" ? { step: "Contact details" } : {}),
-            label: "Name",
-            name: "name",
-            type: "text",
-            placeholder: "Your name",
-            required: true,
-          },
-          {
-            ...(kind === "multi-step-form" ? { step: "Contact details" } : {}),
-            label: "Email",
-            name: "email",
-            type: "email",
-            placeholder: "you@example.com",
-            required: true,
-          },
-          {
-            ...(kind === "multi-step-form" ? { step: "Request" } : {}),
-            label: "Message",
-            name: "message",
-            type: "textarea",
-            placeholder: "How can we help?",
-            required: true,
-          },
-        ],
-      };
-    default:
-      return null;
-  }
-}
-
-function createBuilderSection(kind: BuilderSectionKind): BuilderNode {
-  const node = (
-    type: string,
-    content?: JsonValue,
-    styles?: BuilderNode["styles"],
-    children?: BuilderNode[],
-  ): BuilderNode => ({
-    id: crypto.randomUUID(),
-    type,
-    visible: true,
-    ...(content === undefined ? {} : { content }),
-    ...(styles === undefined ? {} : { styles }),
-    ...(children === undefined ? {} : { children }),
-  });
-  const heading = (text: string, level = 2) =>
-    node(
-      "heading",
-      { text, level },
-      {
-        desktop: { fontSize: level === 1 ? "64px" : "44px" },
-        mobile: { fontSize: level === 1 ? "38px" : "32px" },
-      },
-    );
-  const paragraph = (text: string) =>
-    node("text", { text }, { desktop: { maxWidth: "62ch", fontSize: "17px", lineHeight: "1.7" } });
-  const structuredContent = createStructuredSectionContent(kind);
-  if (structuredContent) {
-    const structuredSection = node(
-      "section",
-      structuredContent,
-      {
-        desktop: { paddingTop: "80px", paddingBottom: "80px" },
-        mobile: { paddingTop: "48px", paddingBottom: "48px" },
-      },
-      [],
-    );
-    return { ...structuredSection, settings: { sectionType: kind } };
-  }
-  let content: BuilderNode[];
-  switch (kind) {
-    case "hero":
-      content = [
-        {
-          ...paragraph("Section label"),
-          settings: { role: "eyebrow" },
-          styles: {
-            desktop: {
-              fontSize: "11px",
-              fontWeight: "600",
-              letterSpacing: "0.24em",
-              textTransform: "uppercase",
-            },
-          },
-        },
-        heading("New page heading", 1),
-        paragraph("Add a clear introduction for this page."),
-        node("button", { label: "Learn more", href: "/contact", variant: "inverse" }),
-      ];
-      break;
-    case "image-text":
-      content = [
-        node(
-          "grid",
-          undefined,
-          {
-            desktop: { gridTemplateColumns: "1fr 1fr", gap: "48px", alignItems: "center" },
-            mobile: { gridTemplateColumns: "1fr", gap: "24px" },
-          },
-          [
-            node("stack", undefined, { desktop: { gap: "24px" } }, [
-              heading("Section heading"),
-              paragraph("Explain this section and why it matters to the reader."),
-            ]),
-            node(
-              "image",
-              { url: "/site-assets/global/logo.png", alt: "", caption: "" },
-              { desktop: { aspectRatio: "4 / 3" } },
-            ),
-          ],
-        ),
-      ];
-      break;
-    case "cards":
-      content = [
-        heading("Featured information"),
-        paragraph("Add a clear lead for this collection."),
-        node(
-          "grid",
-          undefined,
-          {
-            desktop: { gridTemplateColumns: "repeat(3, 1fr)", gap: "24px" },
-            mobile: { gridTemplateColumns: "1fr" },
-          },
-          [
-            ...[1, 2, 3].map((index) =>
-              node(
-                "stack",
-                undefined,
-                { desktop: { padding: "28px", border: "1px solid var(--border)", gap: "12px" } },
-                [heading(`Card ${index}`, 3), paragraph("Add supporting details here.")],
-              ),
-            ),
-          ],
-        ),
-      ];
-      break;
-    case "call-to-action":
-      content = [
-        heading("Ready to get started?"),
-        paragraph("Invite visitors to take the next step."),
-        node("button", { label: "Contact us", href: "/contact", variant: "inverse" }),
-      ];
-      break;
-    default:
-      content = [heading("Section heading"), paragraph("Add your section content here.")];
-  }
-  const section = node(
-    "section",
-    undefined,
-    {
-      desktop: {
-        paddingTop: kind === "hero" ? "120px" : "80px",
-        paddingBottom: kind === "hero" ? "120px" : "80px",
-        ...(kind === "hero" ? { backgroundColor: "var(--primary)" } : {}),
-        ...(kind === "call-to-action" ? { backgroundColor: "var(--inverse)" } : {}),
-      },
-      mobile: { paddingTop: "48px", paddingBottom: "48px" },
-    },
-    [node("container", undefined, undefined, content)],
-  );
-  return {
-    ...section,
-    settings: {
-      sectionType: kind,
-      ...(kind === "hero" || kind === "call-to-action"
-        ? { desktopImageUrl: "", mobileImageUrl: "", imageAlt: "" }
-        : {}),
-    },
-  };
-}
-
 function MediaLibrary({ token }: { token: string }) {
   const queryClient = useQueryClient();
   const [dragging, setDragging] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
+  const [imageToDelete, setImageToDelete] = useState<string | null>(null);
   const uploads = useQuery({
     queryKey: uploadQueryKey,
     queryFn: ({ signal }) => uploadService.getAll(token, signal),
@@ -3567,11 +2959,7 @@ function MediaLibrary({ token }: { token: string }) {
                       type="button"
                       title="Delete image"
                       disabled={remove.isPending && remove.variables === image.fileName}
-                      onClick={() => {
-                        if (window.confirm("Delete this image permanently?")) {
-                          remove.mutate(image.fileName);
-                        }
-                      }}
+                      onClick={() => setImageToDelete(image.fileName)}
                       className="grid size-9 place-items-center rounded-full border border-error/30 text-error transition-colors hover:bg-error/5 disabled:opacity-50"
                     >
                       {remove.isPending && remove.variables === image.fileName ? (
@@ -3597,6 +2985,18 @@ function MediaLibrary({ token }: { token: string }) {
           </div>
         )}
       </div>
+      <ConfirmDialog
+        open={imageToDelete !== null}
+        onOpenChange={(open) => !open && setImageToDelete(null)}
+        title="Permanently delete image?"
+        description={`Delete “${imageToDelete ?? "this image"}” from the media library? This cannot be undone.`}
+        confirmLabel="Delete image"
+        pending={remove.isPending}
+        onConfirm={() => {
+          if (!imageToDelete) return;
+          remove.mutate(imageToDelete, { onSuccess: () => setImageToDelete(null) });
+        }}
+      />
     </div>
   );
 }
@@ -3860,7 +3260,7 @@ function NavigationItemsEditor({
     onChange(next);
   };
   const createItem = (): SaveNavigationItem => ({
-    id: crypto.randomUUID(),
+    id: createId(),
     label: "New link",
     linkType: pages.length ? "page" : "url",
     pageId: pages[0]?.id ?? null,
@@ -4467,7 +3867,7 @@ function blankLike(value: JsonValue | undefined): JsonValue {
   if (Array.isArray(value)) return [];
   return Object.fromEntries(
     Object.entries(value).map(([key, entry]) => {
-      if (key === "id") return [key, crypto.randomUUID()];
+      if (key === "id") return [key, createId()];
       if (key === "type" || key === "linkType") return [key, entry];
       if (key === "visible" || key === "isVisible") return [key, true];
       return [key, blankLike(entry)];

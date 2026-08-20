@@ -182,9 +182,14 @@
   html {
     scroll-behavior: smooth;
     -webkit-text-size-adjust: 100%;
+    max-width: 100%;
+    overflow-x: clip;
   }
 
   body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: clip;
     background-color: var(--background);
     color: var(--body);
     font-family: var(--font-body);
@@ -237,6 +242,20 @@
     background: var(--brand-050);
     color: var(--brand-900);
   }
+}
+
+/* Builder content can contain editor-defined desktop dimensions. Keep every
+ * rendered page within its viewport even when legacy content has fixed sizes. */
+.builder-page,
+.builder-page * {
+  min-width: 0;
+}
+
+.builder-page img,
+.builder-page video,
+.builder-page iframe,
+.builder-page svg {
+  max-width: 100%;
 }
 
 /* ---------- Typography scale ---------- */

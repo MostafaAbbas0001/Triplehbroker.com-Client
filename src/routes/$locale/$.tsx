@@ -1,6 +1,7 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { ApiError } from "@/api/apiClient";
-import { CmsPageView, cmsPageHead, loadCmsPage } from "@/components/builder/CmsPageRoute";
+import { CmsPageView } from "@/components/builder/CmsPageRoute";
+import { cmsPageHead, loadCmsPage } from "@/components/builder/cmsPageRouteData";
 import { toLocale } from "@/lib/seo";
 
 export const Route = createFileRoute("/$locale/$")({

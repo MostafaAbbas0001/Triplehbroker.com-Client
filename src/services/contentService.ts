@@ -65,10 +65,13 @@ async function getContact(queryClient: QueryClient, locale: Locale): Promise<Con
   const methods = records(details["items"]);
   const byLabel = (part: string) =>
     methods.find((item) => text(item["label"]).toLowerCase().includes(part));
-  const email = methods.find((item) => text(item["href"]).startsWith("mailto:")) ?? byLabel("email");
+  const email =
+    methods.find((item) => text(item["href"]).startsWith("mailto:")) ?? byLabel("email");
   const whatsapp = byLabel("whatsapp") ?? byLabel("واتساب");
   const phone =
-    methods.find((item) => item !== email && item !== whatsapp && text(item["href"]).startsWith("tel:")) ??
+    methods.find(
+      (item) => item !== email && item !== whatsapp && text(item["href"]).startsWith("tel:"),
+    ) ??
     byLabel("phone") ??
     byLabel("هاتف");
   const fields = records(form["items"]);
@@ -111,7 +114,10 @@ async function getContact(queryClient: QueryClient, locale: Locale): Promise<Con
       subject: text(field("subject")["label"]),
       subjectOptions: Array.isArray(subjectOptions)
         ? subjectOptions.map(text)
-        : text(subjectOptions).split(",").map((item) => item.trim()).filter(Boolean),
+        : text(subjectOptions)
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean),
       message: text(field("message")["label"]),
       submit: text(form["submitLabel"]),
       success: text(form["successMessage"]),
